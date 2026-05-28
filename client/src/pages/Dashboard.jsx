@@ -22,7 +22,8 @@ export default function Dashboard() {
     fetchTasks, 
     addTask, 
     updateTask, 
-    isTasksLoading 
+    isTasksLoading,
+    user
   } = useAuthStore();
 
   // Filters state
@@ -45,10 +46,13 @@ export default function Dashboard() {
     dueDate: ''
   });
 
-  // Load user tasks on mount
+  // Re-fetch tasks whenever the authenticated user changes (handles logout/login cycles).
+  // Guarded by user.id so it never fires before Firebase confirms the session,
+  // eliminating the 401 race condition.
   useEffect(() => {
+    if (!user?.id) return;
     fetchTasks();
-  }, []);
+  }, [user?.id]);
 
   // Update modal form when editingTask changes
   useEffect(() => {

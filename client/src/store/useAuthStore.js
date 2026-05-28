@@ -179,7 +179,11 @@ export const useAuthStore = create((set, get) => {
 
     // Sign out
     logout: async () => {
-      set({ isLoading: true });
+      // Immediately clear tasks from UI before async signOut completes
+      set({ isLoading: true, tasks: [], stats: {
+        totalTasks: 0, completedTasks: 0, activeTasks: 0,
+        highPriority: 0, mediumPriority: 0, lowPriority: 0
+      }});
 
       if (!isFirebaseConfigured) {
         localStorage.removeItem('taskly_mock_session');
@@ -359,9 +363,13 @@ export const useAuthStore = create((set, get) => {
                 isLoading: false
               });
 
-              // Load tasks reactively
+              // Fetch tasks — single source of truth after auth confirms.
+              // Dashboard's useEffect also calls this but is guarded by user.id,
+              // so whichever fires first is idempotent.
               get().fetchTasks();
             } else {
+              // User signed out — clear everything including tasks
+              console.log('[AUTH] User signed out, clearing tasks.');
               set(resetAuthState());
             }
           } catch (callbackErr) {
@@ -455,10 +463,24 @@ export const useAuthStore = create((set, get) => {
       set({ stats: get().tasks.length ? calculateStats(get().tasks) : get().stats });
     },
 
+    // Explicitly clear tasks (used as a safety net on logout)
+    clearTasks: () => {
+      set({
+        tasks: [],
+        stats: {
+          totalTasks: 0, completedTasks: 0, activeTasks: 0,
+          highPriority: 0, mediumPriority: 0, lowPriority: 0
+        }
+      });
+    },
+
     // Tasks CRUD: Fetch tasks scoped to user in Firestore
     fetchTasks: async () => {
-      const uid = get().user?.id || auth.currentUser?.uid;
-      if (!uid) return;
+      const uid = get().user?.id || auth?.currentUser?.uid;
+      if (!uid) {
+        console.warn('[fetchTasks] Skipped — no authenticated user uid available yet.');
+        return;
+      }
 
       set({ isTasksLoading: true });
 
