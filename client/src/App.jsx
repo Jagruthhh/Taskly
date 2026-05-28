@@ -88,24 +88,11 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
-  const { isLoading } = useAuthStore();
-
   useEffect(() => {
     // Register the auth listener ONCE. Returns an unsubscribe fn for cleanup.
     const unsubscribe = useAuthStore.getState().initAuthListener();
     return () => unsubscribe?.();
   }, []);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center text-slate-500 gap-3">
-        <div className="w-12 h-12 border-4 border-brand-indigo border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs uppercase tracking-widest font-heading font-bold text-brand-indigo animate-pulse">
-          Establishing Environment
-        </span>
-      </div>
-    );
-  }
 
   return (
     <ErrorBoundary>
