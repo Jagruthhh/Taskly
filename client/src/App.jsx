@@ -88,10 +88,12 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
-  const { checkAuth, isLoading } = useAuthStore();
+  const { isLoading } = useAuthStore();
 
   useEffect(() => {
-    checkAuth();
+    // Register the auth listener ONCE. Returns an unsubscribe fn for cleanup.
+    const unsubscribe = useAuthStore.getState().initAuthListener();
+    return () => unsubscribe?.();
   }, []);
 
   if (isLoading) {

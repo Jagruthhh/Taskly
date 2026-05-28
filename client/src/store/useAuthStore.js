@@ -204,183 +204,136 @@ export const useAuthStore = create((set, get) => {
       }
     },
 
-    // Reactive Auth State & Firestore Sync Listener on mount
-    checkAuth: async () => {
-      set({ isLoading: true });
+    // Deprecated — kept for compatibility. initAuthListener handles auth now.
+    checkAuth: () => {
+      get().initAuthListener();
+    },
 
-      try {
-        if (!isFirebaseConfigured || !auth || !db) {
-          // Offline Developer Mock Restore check
-          const isMockActive = localStorage.getItem('taskly_mock_session') === 'true';
-          if (isMockActive) {
-            let savedProfile = {
-              id: 'mock-developer-uid-123',
-              name: 'Local Developer',
-              email: 'developer@taskly.com',
-              avatar: { initials: 'DV', bgColor: '#6366F1', imageUrl: '' },
-              streak: 0,
-              lastActiveDate: ''
-            };
+    // ONE persistent listener registered ONCE at app startup via App.jsx useEffect.
+    // Returns the unsubscribe function so the caller can clean up on unmount.
+    initAuthListener: () => {
+      if (!isFirebaseConfigured || !auth || !db) {
+        // Mock mode
+        const isMockActive = localStorage.getItem('taskly_mock_session') === 'true';
+        if (isMockActive) {
+          let savedProfile = {
+            id: 'mock-developer-uid-123',
+            name: 'Local Developer',
+            email: 'developer@taskly.com',
+            avatar: { initials: 'DV', bgColor: '#6366F1', imageUrl: '' },
+            streak: 0,
+            lastActiveDate: ''
+          };
+          try {
+            const cached = localStorage.getItem('taskly_mock_profile');
+            if (cached) savedProfile = JSON.parse(cached);
+          } catch (e) {}
+
+          const todayStr = new Date().toLocaleDateString('en-CA');
+          const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayStr = yesterday.toLocaleDateString('en-CA');
+          let currentStreak = savedProfile.streak || 0;
+          let lastActive = savedProfile.lastActiveDate || '';
+          if (lastActive !== todayStr) {
+            currentStreak = lastActive === yesterdayStr ? currentStreak + 1 : 1;
+            savedProfile.streak = currentStreak;
+            savedProfile.lastActiveDate = todayStr;
+            localStorage.setItem('taskly_mock_profile', JSON.stringify(savedProfile));
+          }
+          set({ user: savedProfile, isAuthenticated: true, isLoading: false });
+          get().fetchTasks();
+        } else {
+          set(resetAuthState());
+        }
+        return () => {}; // no-op unsubscribe for mock mode
+      }
+
+      // Register ONE listener — never call this more than once
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        try {
+          if (firebaseUser) {
+            const uid = firebaseUser.uid;
+            const userDocRef = doc(db, 'users', uid);
+
+            let userDocSnap;
             try {
-              const cached = localStorage.getItem('taskly_mock_profile');
-              if (cached) savedProfile = JSON.parse(cached);
-            } catch (e) {}
-
-            // Calculate mock active streak (client-side offline simulation)
-            const todayStr = new Date().toLocaleDateString('en-CA');
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayStr = yesterday.toLocaleDateString('en-CA');
-
-            let currentStreak = savedProfile.streak || 0;
-            let lastActive = savedProfile.lastActiveDate || '';
-
-            if (lastActive !== todayStr) {
-              if (lastActive === yesterdayStr) {
-                currentStreak += 1;
-              } else {
-                currentStreak = 1;
-              }
-              savedProfile.streak = currentStreak;
-              savedProfile.lastActiveDate = todayStr;
-              localStorage.setItem('taskly_mock_profile', JSON.stringify(savedProfile));
-              console.log(`[MOCK STREAK] Active streak updated to ${currentStreak} days!`);
+              userDocSnap = await getDoc(userDocRef);
+            } catch (fsError) {
+              console.error('Firestore Read Error:', fsError);
+              toast.error('Firestore Database unavailable.');
+              set(resetAuthState());
+              return;
             }
 
-            set({
-              user: savedProfile,
-              isAuthenticated: true,
-              isLoading: false
-            });
-            get().fetchTasks();
-          } else {
-            set(resetAuthState());
-          }
-          return;
-        }
+            const todayStr = new Date().toLocaleDateString('en-CA');
+            const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toLocaleDateString('en-CA');
+            let profileData;
 
-        // actual Firestore session listeners mapping safely wrapped in try-catch
-        onAuthStateChanged(auth, async (firebaseUser) => {
-          try {
-            if (firebaseUser) {
-              const uid = firebaseUser.uid;
-              
-              // Look up Firestore User profile safely
-              const userDocRef = doc(db, 'users', uid);
-              
-              let userDocSnap;
+            if (!userDocSnap.exists()) {
+              const computedName = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User';
+              const initials = computedName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() || 'US';
+              const defaultColors = ['#6366F1', '#10B981', '#F59E0B', '#3B82F6', '#EC4899'];
+              const bgColor = defaultColors[Math.floor(Math.random() * defaultColors.length)];
+              profileData = {
+                id: uid,
+                name: computedName,
+                email: firebaseUser.email || `${uid}@firebase.com`,
+                avatar: JSON.stringify({ initials, bgColor, imageUrl: firebaseUser.photoURL || '' }),
+                createdAt: new Date().toISOString(),
+                streak: 1,
+                lastActiveDate: todayStr
+              };
               try {
-                userDocSnap = await getDoc(userDocRef);
-              } catch (fsError) {
-                console.error('Firestore Read Error:', fsError);
-                toast.error('Firestore Database unavailable. Please make sure you have enabled "Cloud Firestore" in your Firebase Console!');
+                await setDoc(userDocRef, profileData);
+              } catch (fsWriteError) {
+                console.error('Firestore Write Error:', fsWriteError);
+                toast.error('Firestore Write permission denied.');
                 set(resetAuthState());
                 return;
               }
-              
-              const todayStr = new Date().toLocaleDateString('en-CA');
-              const yesterday = new Date();
-              yesterday.setDate(yesterday.getDate() - 1);
-              const yesterdayStr = yesterday.toLocaleDateString('en-CA');
-
-              let profileData;
-
-              if (!userDocSnap.exists()) {
-                // --- DYNAMIC REGISTER SYNC IN FIRESTORE ---
-                console.log(`[FIRESTORE] Provisioning new user profile in db: ${firebaseUser.email}`);
-                const computedName = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User';
-                const initials = computedName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() || 'US';
-                const defaultColors = ['#6366F1', '#10B981', '#F59E0B', '#3B82F6', '#EC4899'];
-                const bgColor = defaultColors[Math.floor(Math.random() * defaultColors.length)];
-
-                const defaultAvatar = {
-                  initials,
-                  bgColor,
-                  imageUrl: firebaseUser.photoURL || ''
-                };
-
-                profileData = {
-                  id: uid,
-                  name: computedName,
-                  email: firebaseUser.email || `${uid}@firebase.com`,
-                  avatar: JSON.stringify(defaultAvatar),
-                  createdAt: new Date().toISOString(),
-                  streak: 1,
-                  lastActiveDate: todayStr
-                };
-
-                try {
-                  await setDoc(userDocRef, profileData);
-                } catch (fsWriteError) {
-                  console.error('Firestore Write Error:', fsWriteError);
-                  toast.error('Firestore Write permission denied. Please verify your Firestore Security Rules in the Firebase Console!');
-                  set(resetAuthState());
-                  return;
-                }
-              } else {
-                profileData = userDocSnap.data();
-
-                // Calculate active streak
-                let currentStreak = profileData.streak || 0;
-                let lastActive = profileData.lastActiveDate || '';
-
-                if (lastActive !== todayStr) {
-                  if (lastActive === yesterdayStr) {
-                    currentStreak += 1;
-                  } else {
-                    currentStreak = 1;
-                  }
-
-                  try {
-                    await updateDoc(userDocRef, {
-                      streak: currentStreak,
-                      lastActiveDate: todayStr
-                    });
-                    profileData.streak = currentStreak;
-                    profileData.lastActiveDate = todayStr;
-                    console.log(`[STREAK] Active streak updated to ${currentStreak} days!`);
-                  } catch (fsUpdateError) {
-                    console.error('Firestore Streak Update Error:', fsUpdateError);
-                  }
-                }
-              }
-
-              // Parse avatar string safely
-              let parsedAvatar;
-              try {
-                parsedAvatar = typeof profileData.avatar === 'string' ? JSON.parse(profileData.avatar) : profileData.avatar;
-              } catch (e) {
-                parsedAvatar = { initials: 'US', bgColor: '#6366F1', imageUrl: '' };
-              }
-
-              set({
-                user: {
-                  ...profileData,
-                  id: uid, // Enforce id is always set to active Firebase UID!
-                  avatar: parsedAvatar
-                },
-                isAuthenticated: true,
-                isLoading: false
-              });
-
-              // Fetch tasks — single source of truth after auth confirms.
-              // Dashboard's useEffect also calls this but is guarded by user.id,
-              // so whichever fires first is idempotent.
-              get().fetchTasks();
             } else {
-              // User signed out — clear everything including tasks
-              console.log('[AUTH] User signed out, clearing tasks.');
-              set(resetAuthState());
+              profileData = userDocSnap.data();
+              let currentStreak = profileData.streak || 0;
+              let lastActive = profileData.lastActiveDate || '';
+              if (lastActive !== todayStr) {
+                currentStreak = lastActive === yesterdayStr ? currentStreak + 1 : 1;
+                try {
+                  await updateDoc(userDocRef, { streak: currentStreak, lastActiveDate: todayStr });
+                  profileData.streak = currentStreak;
+                  profileData.lastActiveDate = todayStr;
+                  console.log(`[STREAK] Updated to ${currentStreak} days.`);
+                } catch (e) { console.error('Streak update error:', e); }
+              }
             }
-          } catch (callbackErr) {
-            console.error('Error inside Firebase Auth state listener callback:', callbackErr);
+
+            let parsedAvatar;
+            try {
+              parsedAvatar = typeof profileData.avatar === 'string' ? JSON.parse(profileData.avatar) : profileData.avatar;
+            } catch (e) {
+              parsedAvatar = { initials: 'US', bgColor: '#6366F1', imageUrl: '' };
+            }
+
+            // SET user first — fetchTasks reads user.id so order matters
+            set({
+              user: { ...profileData, id: uid, avatar: parsedAvatar },
+              isAuthenticated: true,
+              isLoading: false
+            });
+            await get().fetchTasks();
+
+          } else {
+            // Signed out — clear everything
+            console.log('[AUTH] Signed out, clearing state.');
             set(resetAuthState());
           }
-        });
-      } catch (globalErr) {
-        console.error('Global checkAuth exception:', globalErr);
-        set(resetAuthState());
-      }
+        } catch (err) {
+          console.error('Auth listener error:', err);
+          set(resetAuthState());
+        }
+      });
+
+      return unsubscribe; // App.jsx calls this on unmount
     },
 
     // Edit user display details in Firestore
