@@ -26,7 +26,7 @@
     <meta name="twitter:description" content="Organize, prioritize, and track your daily tasks with Taskly. Drag-and-drop boards, streaks, and real-time Firebase sync." />
     <meta name="twitter:image" content="https://todolist-1f97a.web.app/og-image.png" />
 
-    <!-- JSON-LD Schema -->
+    <!-- JSON-LD Schema: WebApplication -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -44,6 +44,17 @@
     }
     </script>
 
+    <!-- JSON-LD Schema: Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Taskly",
+      "url": "https://todolist-1f97a.web.app/",
+      "description": "A simple, fast task manager app to organize your daily tasks, set priorities, and track your productivity."
+    }
+    </script>
+
     <!-- Google Fonts Pairing: Syne for Headings + DM Sans for Body -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,5 +63,36 @@
   <body class="bg-brand-dark text-slate-100 font-body min-h-screen selection:bg-indigo-500 selection:text-white antialiased overflow-x-hidden">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Static content for crawlers that don't execute JavaScript -->
+    <noscript>
+      <main style="font-family:system-ui,sans-serif;max-width:800px;margin:0 auto;padding:2rem;color:#f1f5f9;background:#0f1117;min-height:100vh">
+        <h1>My Tasks — Taskly</h1>
+        <p>
+          Taskly is a smart, premium task manager that helps you stay organized,
+          focused, and productive. Add tasks, set priorities, track deadlines,
+          and watch your daily streak grow — all synced in real time.
+        </p>
+
+        <section>
+          <h2>Add a New Task</h2>
+          <p>Quickly create tasks with a title, priority level (Low, Medium, High), category tag, and optional due date. Use the quick-add bar or the full task editor for detailed entries.</p>
+        </section>
+
+        <section>
+          <h2>Your Task List</h2>
+          <p>View all your tasks in one place. Filter by status (Active / Completed), priority, or category. Drag and drop to reorder tasks to match your workflow.</p>
+        </section>
+
+        <section>
+          <h2>Track Your Progress</h2>
+          <p>A live completion ring shows how many tasks you've finished today. Keep your daily streak alive by completing at least one task every day.</p>
+        </section>
+
+        <footer style="margin-top:3rem;padding-top:1rem;border-top:1px solid #1e293b;color:#64748b;font-size:0.875rem">
+          <p>© 2026 Taskly. Built to help you stay organized and productive every day.</p>
+        </footer>
+      </main>
+    </noscript>
   </body>
 </html>

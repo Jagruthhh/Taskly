@@ -206,26 +206,30 @@ export default function Dashboard() {
         </section>
 
         {/* Quick Task Creation bar */}
-        <form onSubmit={handleQuickAdd} className="flex gap-3 mb-8 w-full">
-          <input
-            type="text"
-            placeholder="⚡ Quick-add a task and press Enter..."
-            value={quickTitle}
-            onChange={(e) => setQuickTitle(e.target.value)}
-            className="flex-1 py-3.5 px-5 rounded-2xl text-slate-200 glass-input font-medium placeholder-slate-500 shadow-sm"
-          />
-          <button
-            type="submit"
-            onClick={handleQuickAdd}
-            className="p-3.5 rounded-2xl bg-brand-indigo hover:bg-indigo-600 text-white font-bold transition-all shadow-indigo-glow hover:shadow-[0_0_20px_rgba(99,102,241,0.55)] flex items-center justify-center shrink-0"
-            title="Create Task"
-          >
-            <Plus className="w-6 h-6 stroke-[3]" />
-          </button>
-        </form>
+        <section aria-labelledby="quick-add-heading">
+          <h2 id="quick-add-heading" className="sr-only">Add a New Task</h2>
+          <form onSubmit={handleQuickAdd} className="flex gap-3 mb-8 w-full">
+            <input
+              type="text"
+              placeholder="⚡ Quick-add a task and press Enter..."
+              value={quickTitle}
+              onChange={(e) => setQuickTitle(e.target.value)}
+              className="flex-1 py-3.5 px-5 rounded-2xl text-slate-200 glass-input font-medium placeholder-slate-500 shadow-sm"
+            />
+            <button
+              type="submit"
+              onClick={handleQuickAdd}
+              className="p-3.5 rounded-2xl bg-brand-indigo hover:bg-indigo-600 text-white font-bold transition-all shadow-indigo-glow hover:shadow-[0_0_20px_rgba(99,102,241,0.55)] flex items-center justify-center shrink-0"
+              title="Create Task"
+            >
+              <Plus className="w-6 h-6 stroke-[3]" />
+            </button>
+          </form>
+        </section>
 
         {/* Filter controls panel */}
-        <section className="glass-card rounded-2xl border border-white/5 p-4 sm:p-5 mb-6">
+        <section aria-labelledby="tasklist-heading" className="glass-card rounded-2xl border border-white/5 p-4 sm:p-5 mb-6">
+          <h2 id="tasklist-heading" className="sr-only">Your Task List</h2>
           <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch">
             
             {/* Search Input */}
@@ -306,6 +310,14 @@ export default function Dashboard() {
             <TaskList tasks={filteredTasks} onEditTask={openEditModal} />
           )}
         </section>
+
+        {/* Footer citation signal */}
+        <footer className="mt-10 pt-6 border-t border-white/5 text-center">
+          <p className="text-xs text-slate-600">
+            &copy; 2026 Taskly — Built to help you stay organized and productive every day.
+          </p>
+        </footer>
+
       </main>
 
       {/* Floating Action Button (FAB) for mobile & desktop shortcuts */}
