@@ -51,7 +51,9 @@ export default function Dashboard() {
   // eliminating the 401 race condition.
   useEffect(() => {
     if (!user?.id) return;
-    fetchTasks();
+    // Small delay ensures Firebase auth token is fully settled before Firestore read
+    const timer = setTimeout(() => fetchTasks(), 300);
+    return () => clearTimeout(timer);
   }, [user?.id]);
 
   // Update modal form when editingTask changes

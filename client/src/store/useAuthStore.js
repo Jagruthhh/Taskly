@@ -567,7 +567,7 @@ export const useAuthStore = create((set, get) => {
       }
     },
 
-    // Tasks CRUD: Toggle status (Optimistic)
+    // ─── Toggle Task Complete → auto-delete when checked ─────────────────────
     toggleTask: async (taskId) => {
       const originalTasks = get().tasks;
       const task = originalTasks.find((t) => t.id === taskId);
@@ -575,14 +575,18 @@ export const useAuthStore = create((set, get) => {
 
       const nextStatus = !task.isCompleted;
 
-      const optimisticList = originalTasks.map((t) =>
-        t.id === taskId ? { ...t, isCompleted: nextStatus } : t
-      );
+      if (nextStatus === true) {
+        // User just checked it off → delete it entirely
+        await get().deleteTask(taskId);
+        toast.success('Task completed & removed! 🎉');
+        return;
+      }
 
-      set({
-        tasks: optimisticList,
-        stats: calculateStats(optimisticList)
-      });
+      // Unchecking — just toggle back to active (optimistic)
+      const optimisticList = originalTasks.map((t) =>
+        t.id === taskId ? { ...t, isCompleted: false } : t
+      );
+      set({ tasks: optimisticList, stats: calculateStats(optimisticList) });
 
       if (!isFirebaseConfigured) {
         localStorage.setItem('taskly_mock_tasks', JSON.stringify(optimisticList));
@@ -591,16 +595,9 @@ export const useAuthStore = create((set, get) => {
 
       try {
         const taskDocRef = doc(db, 'tasks', taskId);
-        await updateDoc(taskDocRef, {
-          isCompleted: nextStatus,
-          updatedAt: new Date().toISOString()
-        });
+        await updateDoc(taskDocRef, { isCompleted: false, updatedAt: new Date().toISOString() });
       } catch (error) {
-        // Rollback
-        set({
-          tasks: originalTasks,
-          stats: calculateStats(originalTasks)
-        });
+        set({ tasks: originalTasks, stats: calculateStats(originalTasks) });
         toast.error('Failed to toggle task');
       }
     },
