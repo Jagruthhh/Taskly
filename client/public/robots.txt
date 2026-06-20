@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://todolist-1f97a.web.app/sitemap.xml
